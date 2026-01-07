@@ -7,6 +7,7 @@ import (
 
 	"github.com/Niteesh-Kulhari/StreamMovies/Server/StreamMovieServer/database"
 	"github.com/Niteesh-Kulhari/StreamMovies/Server/StreamMovieServer/models"
+	"github.com/Niteesh-Kulhari/StreamMovies/Server/StreamMovieServer/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -41,13 +42,13 @@ func RegisterUser() gin.HandlerFunc {
 		validate := validator.New()
 
 		if err := validate.Struct(user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data", "detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed", "details": err.Error()})
 			return
 		}
 
 		hashedPassword, err := HashPassword(user.Password)
 		if err != nil {
-
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to hash password"})
 		}
 
 		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
@@ -74,5 +75,55 @@ func RegisterUser() gin.HandlerFunc {
 
 		c.JSON(http.StatusCreated, result)
 
+	}
+}
+
+func LoginUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var userLogin models.UserLogin
+
+		if err := c.ShouldBindJSON(&userLogin); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Input data"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		var foundUser models.User
+
+		err := userCollection.FindOne(ctx, bson.M{"email": userLogin.Email}).Decode(&foundUser)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Email or Password"})
+			return
+		}
+
+		err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(userLogin.Password))
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Email or Password"})
+			return
+		}
+
+		token, refreshToken, err := utils.GenerateAllToken(foundUser.Email, foundUser.FirstName, foundUser.LatsName, foundUser.Role, foundUser.UserId)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+			return
+		}
+
+		err = utils.UpdateAllTokens(foundUser.UserId, token, refreshToken)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Token to DB"})
+		}
+
+		c.JSON(http.StatusOK, models.UserResponse{
+			UserId:          foundUser.UserId,
+			FirstName:       foundUser.FirstName,
+			LastName:        foundUser.LatsName,
+			Email:           foundUser.Email,
+			Role:            foundUser.Role,
+			Token:           token,
+			RefreshToken:    refreshToken,
+			FavouriteGenres: foundUser.FavouriteGenres,
+		})
 	}
 }

@@ -20,3 +20,20 @@ type User struct {
 	RefreshToken    string        `json:"refresh_token" bson:"refresh_token"`
 	FavouriteGenres []Genre       `json:"favourite_genres" bson:"favourite_genres" validate:"required,dive"`
 }
+
+type UserLogin struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
+}
+
+// DTO - Data Transfer Object
+type UserResponse struct {
+	UserId          string  `json:"user_id"`
+	FirstName       string  `json:"first_name"`
+	LastName        string  `json:"last_name"`
+	Email           string  `json:"emai"`
+	Role            string  `json:"role"`
+	Token           string  `json:"token"`
+	RefreshToken    string  `json:"refresh_token"`
+	FavouriteGenres []Genre `json:"fvourite_genres"`
+}
