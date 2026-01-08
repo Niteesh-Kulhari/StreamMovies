@@ -91,3 +91,13 @@ func AddMovie() gin.HandlerFunc {
 		c.JSON(http.StatusCreated, result)
 	}
 }
+
+func AdminReviewUpdate() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		movieId := c.Param("imdb_id")
+
+		if movieId == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Movie Id required"})
+		}
+	}
+}
